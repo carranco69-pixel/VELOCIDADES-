@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Parámetros de Corte Waterjet</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col items-center p-4 sm:p-6">
+    <div class="w-full max-w-4xl bg-slate-800 rounded-xl shadow-2xl overflow-hidden border border-slate-700">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-center">
+            <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">Parámetros de Corte Waterjet</h1>
+            <p class="text-blue-200 text-sm mt-1">Selecciona material, espesor y calidad para consultar la configuración CNC</p>
+        </div>
+
+        <!-- Formulario de Selección -->
+        <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Material -->
+            <div>
+                <label for="materialSelect" class="block text-sm font-medium text-slate-300 mb-2">1. Material</label>
+                <select id="materialSelect" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <option value="">-- Selecciona Material --</option>
+                </select>
+            </div>
+
+            <!-- Espesor (Filtrado dinámicamente) -->
+            <div>
+                <label for="thicknessSelect" class="block text-sm font-medium text-slate-300 mb-2">2. Espesor (mm)</label>
+                <select id="thicknessSelect" disabled class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:opacity-50">
+                    <option value="">-- Primero el material --</option>
+                </select>
+            </div>
+
+            <!-- Calidad -->
+            <div>
+                <label for="qualitySelect" class="block text-sm font-medium text-slate-300 mb-2">3. Calidad de Corte</label>
+                <select id="qualitySelect" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <option value="basto">Basto</option>
+                    <option value="medio">Medio</option>
+                    <option value="fino">Fino</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Resultados -->
+        <div id="resultsContainer" class="px-6 pb-8 hidden">
+            <div class="border-t border-slate-700 pt-6">
+                <h2 class="text-lg font-semibold text-blue-400 mb-4">Parámetros Calculados y de Configuración</h2>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Velocidad de Corte -->
+                    <div class="bg-slate-900 p-4 rounded-lg border border-slate-700">
+                        <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Velocidad de Corte</span>
+                        <div id="resSpeed" class="text-2xl font-bold text-emerald-400 mt-1">--</div>
+                    </div>
+
+                    <!-- Perforación Alta Presión -->
+                    <div class="bg-slate-900 p-4 rounded-lg border border-slate-700">
+                        <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Perf. Alta Presión</span>
+                        <div id="resPerfAP" class="text-xl font-bold text-blue-300 mt-1">--</div>
+                    </div>
+
+                    <!-- Perforación Baja Presión -->
+                    <div class="bg-slate-900 p-4 rounded-lg border border-slate-700">
+                        <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Perf. Baja Presión</span>
+                        <div id="resPerfBP" class="text-xl font-bold text-blue-300 mt-1">--</div>
+                    </div>
+
+                    <!-- Presión -->
+                    <div class="bg-slate-900 p-4 rounded-lg border border-slate-700">
+                        <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Presión</span>
+                        <div id="resPressure" class="text-lg font-semibold text-slate-200 mt-1">--</div>
+                    </div>
+
+                    <!-- Focalizador -->
+                    <div class="bg-slate-900 p-4 rounded-lg border border-slate-700">
+                        <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Focalizador</span>
+                        <div id="resFocalizer" class="text-lg font-semibold text-slate-200 mt-1">--</div>
+                    </div>
+
+                    <!-- Orificio -->
+                    <div class="bg-slate-900 p-4 rounded-lg border border-slate-700">
+                        <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Orificio</span>
+                        <div id="resOrifice" class="text-lg font-semibold text-slate-200 mt-1">--</div>
+                    </div>
+                </div>
+
+                <!-- Parámetro Extra -->
+                <div class="mt-4 bg-slate-900 p-4 rounded-lg border border-slate-700 flex justify-between items-center">
+                    <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Dynamic Piercing Circles</span>
+                    <span id="resDynamic" class="text-lg font-bold text-purple-400">--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estado vacío o aviso -->
+        <div id="emptyState" class="px-6 pb-8 text-center text-slate-400 py-6">
+            Selecciona un material y un espesor para visualizar los parámetros de corte.
+        </div>
+    </div>
+
+    <!-- Script de Base de Datos y Lógica -->
+    <script>
+        const database = [
+            // Acero Inoxidable
+            { material: "Acero Inoxidable", thickness: 1.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "2914.83 mm/min", speedMedio: "1828.56 mm/min", speedFino: "1313.50 mm/min", perfAP: "0.17 s", perfBP: "0.75 s", dynamic: "0.05" },
+            { material: "Acero Inoxidable", thickness: 2.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "1533.59 mm/min", speedMedio: "962.07 mm/min", speedFino: "691.08 mm/min", perfAP: "0.50 s", perfBP: "2.22 s", dynamic: "0.15" },
+            { material: "Acero Inoxidable", thickness: 5.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "593.16 mm/min", speedMedio: "372.11 mm/min", speedFino: "267.29 mm/min", perfAP: "2.10 s", perfBP: "9.37 s", dynamic: "0.63" },
+            { material: "Acero Inoxidable", thickness: 6.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "483.89 mm/min", speedMedio: "303.56 mm/min", speedFino: "218.05 mm/min", perfAP: "2.79 s", perfBP: "12.48 s", dynamic: "0.84" },
+            { material: "Acero Inoxidable", thickness: 7.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "405.75 mm/min", speedMedio: "254.54 mm/min", speedFino: "182.84 mm/min", perfAP: "3.56 s", perfBP: "15.90 s", dynamic: "1.07" },
+            { material: "Acero Inoxidable", thickness: 8.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "347.31 mm/min", speedMedio: "217.88 mm/min", speedFino: "156.51 mm/min", perfAP: "4.39 s", perfBP: "19.61 s", dynamic: "1.32" },
+            { material: "Acero Inoxidable", thickness: 9.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "302.09 mm/min", speedMedio: "189.51 mm/min", speedFino: "136.13 mm/min", perfAP: "5.28 s", perfBP: "23.60 s", dynamic: "1.58" },
+            { material: "Acero Inoxidable", thickness: 10.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "266.15 mm/min", speedMedio: "166.96 mm/min", speedFino: "119.93 mm/min", perfAP: "6.23 s", perfBP: "27.84 s", dynamic: "1.87" },
+            { material: "Acero Inoxidable", thickness: 12.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "212.86 mm/min", speedMedio: "133.53 mm/min", speedFino: "95.92 mm/min", perfAP: "8.30 s", perfBP: "37.08 s", dynamic: "2.49" },
+            { material: "Acero Inoxidable", thickness: 15.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "160.74 mm/min", speedMedio: "100.83 mm/min", speedFino: "72.43 mm/min", perfAP: "11.78 s", perfBP: "52.65 s", dynamic: "3.53" },
+            { material: "Acero Inoxidable", thickness: 18.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "126.99 mm/min", speedMedio: "79.66 mm/min", speedFino: "57.22 mm/min", perfAP: "15.69 s", perfBP: "70.11 s", dynamic: "4.71" },
+            { material: "Acero Inoxidable", thickness: 20.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "110.53 mm/min", speedMedio: "69.34 mm/min", speedFino: "49.81 mm/min", perfAP: "18.51 s", perfBP: "82.73 s", dynamic: "5.55" },
+            { material: "Acero Inoxidable", thickness: 30.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "71.07 mm/min", speedMedio: "44.59 mm/min", speedFino: "32.02 mm/min", perfAP: "36.21 s", perfBP: "161.85 s", dynamic: "10.87" },
+            { material: "Acero Inoxidable", thickness: 40.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "42.24 mm/min", speedMedio: "26.50 mm/min", speedFino: "19.04 mm/min", perfAP: "55.00 s", perfBP: "245.80 s", dynamic: "16.50" },
+            { material: "Acero Inoxidable", thickness: 50.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "30.42 mm/min", speedMedio: "19.08 mm/min", speedFino: "13.71 mm/min", perfAP: "78.09 s", perfBP: "349.00 s", dynamic: "23.43" },
+            { material: "Acero Inoxidable", thickness: 60.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "23.10 mm/min", speedMedio: "14.49 mm/min", speedFino: "10.41 mm/min", perfAP: "103.99 s", perfBP: "464.75 s", dynamic: "31.20" },
+            { material: "Acero Inoxidable", thickness: 70.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "18.21 mm/min", speedMedio: "11.42 mm/min", speedFino: "8.21 mm/min", perfAP: "132.48 s", perfBP: "592.09 s", dynamic: "39.74" },
+            { material: "Acero Inoxidable", thickness: 80.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "14.77 mm/min", speedMedio: "9.26 mm/min", speedFino: "6.65 mm/min", perfAP: "163.40 s", perfBP: "730.29 s", dynamic: "49.02" },
+            { material: "Acero Inoxidable", thickness: 100.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "10.32 mm/min", speedMedio: "6.47 mm/min", speedFino: "4.65 mm/min", perfAP: "232.01 s", perfBP: "1036.91 s", dynamic: "69.60" },
+            { material: "Acero Inoxidable", thickness: 120.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "7.64 mm/min", speedMedio: "4.79 mm/min", speedFino: "3.44 mm/min", perfAP: "308.96 s", perfBP: "1380.82 s", dynamic: "92.69" },
+            { material: "Acero Inoxidable", thickness: 130.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "6.68 mm/min", speedMedio: "4.19 mm/min", speedFino: "3.01 mm/min", perfAP: "350.36 s", perfBP: "1565.84 s", dynamic: "105.11" },
+            { material: "Acero Inoxidable", thickness: 140.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "5.89 mm/min", speedMedio: "3.70 mm/min", speedFino: "2.66 mm/min", perfAP: "393.62 s", perfBP: "1759.18 s", dynamic: "118.09" },
+            { material: "Acero Inoxidable", thickness: 150.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "5.24 mm/min", speedMedio: "3.29 mm/min", speedFino: "2.36 mm/min", perfAP: "438.68 s", perfBP: "1960.57 s", dynamic: "131.60" },
+            { material: "Acero Inoxidable", thickness: 170.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "4.22 mm/min", speedMedio: "2.65 mm/min", speedFino: "1.90 mm/min", perfAP: "534.00 s", perfBP: "2386.59 s", dynamic: "160.20" },
+            { material: "Acero Inoxidable", thickness: 180.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "3.82 mm/min", speedMedio: "2.40 mm/min", speedFino: "1.72 mm/min", perfAP: "584.17 s", perfBP: "2610.81 s", dynamic: "175.25" },
+            { material: "Acero Inoxidable", thickness: 200.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "3.17 mm/min", speedMedio: "1.99 mm/min", speedFino: "1.43 mm/min", perfAP: "689.33 s", perfBP: "3080.78 s", dynamic: "206.80" },
+
+            // Aluminio
+            { material: "Aluminio", thickness: 1.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "7197.74 mm/min", speedMedio: "4515.35 mm/min", speedFino: "3243.48 mm/min", perfAP: "0.08 s", perfBP: "0.34 s", dynamic: "0.02" },
+            { material: "Aluminio", thickness: 2.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "3786.98 mm/min", speedMedio: "2375.68 mm/min", speedFino: "1706.51 mm/min", perfAP: "0.23 s", perfBP: "1.01 s", dynamic: "0.07" },
+            { material: "Aluminio", thickness: 3.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "2524.30 mm/min", speedMedio: "1583.57 mm/min", speedFino: "1137.51 mm/min", perfAP: "0.43 s", perfBP: "1.91 s", dynamic: "0.13" },
+            { material: "Aluminio", thickness: 5.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "1464.72 mm/min", speedMedio: "918.86 mm/min", speedFino: "660.04 mm/min", perfAP: "0.96 s", perfBP: "4.27 s", dynamic: "0.29" },
+            { material: "Aluminio", thickness: 6.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "1194.88 mm/min", speedMedio: "749.58 mm/min", speedFino: "538.44 mm/min", perfAP: "1.27 s", perfBP: "5.69 s", dynamic: "0.38" },
+            { material: "Aluminio", thickness: 10.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "657.21 mm/min", speedMedio: "412.29 mm/min", speedFino: "296.16 mm/min", perfAP: "2.84 s", perfBP: "12.69 s", dynamic: "0.85" },
+            { material: "Aluminio", thickness: 12.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "525.63 mm/min", speedMedio: "329.74 mm/min", speedFino: "236.86 mm/min", perfAP: "3.78 s", perfBP: "16.90 s", dynamic: "1.13" },
+            { material: "Aluminio", thickness: 15.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "396.92 mm/min", speedMedio: "249.00 mm/min", speedFino: "178.86 mm/min", perfAP: "5.37 s", perfBP: "23.99 s", dynamic: "1.61" },
+            { material: "Aluminio", thickness: 18.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "313.58 mm/min", speedMedio: "196.72 mm/min", speedFino: "141.31 mm/min", perfAP: "7.15 s", perfBP: "31.94 s", dynamic: "2.14" },
+            { material: "Aluminio", thickness: 30.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "157.13 mm/min", speedMedio: "98.57 mm/min", speedFino: "70.81 mm/min", perfAP: "15.95 s", perfBP: "71.27 s", dynamic: "4.78" },
+            { material: "Aluminio", thickness: 40.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "104.31 mm/min", speedMedio: "65.44 mm/min", speedFino: "47.01 mm/min", perfAP: "25.06 s", perfBP: "112.00 s", dynamic: "7.52" },
+            { material: "Aluminio", thickness: 50.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "75.12 mm/min", speedMedio: "47.12 mm/min", speedFino: "33.85 mm/min", perfAP: "35.58 s", perfBP: "159.02 s", dynamic: "10.67" },
+            { material: "Aluminio", thickness: 80.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "36.46 mm/min", speedMedio: "22.87 mm/min", speedFino: "16.43 mm/min", perfAP: "74.45 s", perfBP: "332.75 s", dynamic: "22.34" },
+            { material: "Aluminio", thickness: 90.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "30.21 mm/min", speedMedio: "18.95 mm/min", speedFino: "13.62 mm/min", perfAP: "89.59 s", perfBP: "400.39 s", dynamic: "26.88" },
+            { material: "Aluminio", thickness: 120.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "18.87 mm/min", speedMedio: "11.84 mm/min", speedFino: "8.50 mm/min", perfAP: "140.78 s", perfBP: "629.16 s", dynamic: "42.23" },
+            { material: "Aluminio", thickness: 160.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "11.58 mm/min", speedMedio: "7.26 mm/min", speedFino: "5.22 mm/min", perfAP: "221.21 s", perfBP: "988.64 s", dynamic: "66.36" },
+            { material: "Aluminio", thickness: 180.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "9.43 mm/min", speedMedio: "5.92 mm/min", speedFino: "4.25 mm/min", perfAP: "266.17 s", perfBP: "1189.60 s", dynamic: "79.85" },
+            { material: "Aluminio", thickness: 200.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "7.83 mm/min", speedMedio: "4.91 mm/min", speedFino: "3.53 mm/min", perfAP: "314.09 s", perfBP: "1403.73 s", dynamic: "94.23" },
+
+            // Gres
+            { material: "Gres", thickness: 6.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "4668.72 mm/min", speedMedio: "2928.82 mm/min", speedFino: "2103.84 mm/min", perfAP: "0.78 s", perfBP: "3.48 s", dynamic: "0.23" },
+            { material: "Gres", thickness: 7.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "3914.86 mm/min", speedMedio: "2455.90 mm/min", speedFino: "1764.13 mm/min", perfAP: "0.99 s", perfBP: "4.43 s", dynamic: "0.30" },
+            { material: "Gres", thickness: 8.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "3350.99 mm/min", speedMedio: "2102.17 mm/min", speedFino: "1510.04 mm/min", perfAP: "1.22 s", perfBP: "5.46 s", dynamic: "0.37" },
+            { material: "Gres", thickness: 10.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "2567.89 mm/min", speedMedio: "1610.91 mm/min", speedFino: "1157.16 mm/min", perfAP: "1.74 s", perfBP: "7.76 s", dynamic: "0.52" },
+            { material: "Gres", thickness: 14.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "1693.05 mm/min", speedMedio: "1062.10 mm/min", speedFino: "762.93 mm/min", perfAP: "2.94 s", perfBP: "13.16 s", dynamic: "0.88" },
+            { material: "Gres", thickness: 18.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "1225.23 mm/min", speedMedio: "768.62 mm/min", speedFino: "552.12 mm/min", perfAP: "4.37 s", perfBP: "19.53 s", dynamic: "1.31" },
+            { material: "Gres", thickness: 20.00, pressure: "5000 bar", focalizer: "0.76 mm", orifice: "0.23 mm", speedBasto: "1066.46 mm/min", speedMedio: "669.02 mm/min", speedFino: "480.57 mm/min", perfAP: "5.16 s", perfBP: "23.05 s", dynamic: "1.55" }
+        ];
+
+        const materialSelect = document.getElementById('materialSelect');
+        const thicknessSelect = document.getElementById('thicknessSelect');
+        const qualitySelect = document.getElementById('qualitySelect');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const emptyState = document.getElementById('emptyState');
+
+        const materials = [...new Set(database.map(item => item.material))];
+        materials.forEach(mat => {
+            const option = document.createElement('option');
+            option.value = mat;
+            option.textContent = mat;
+            materialSelect.appendChild(option);
+        });
+
+        materialSelect.addEventListener('change', () => {
+            const selectedMat = materialSelect.value;
+            thicknessSelect.innerHTML = '<option value="">-- Selecciona Espesor --</option>';
+            
+            if (selectedMat) {
+                const filtered = database.filter(item => item.material === selectedMat);
+                filtered.sort((a, b) => a.thickness - b.thickness);
+                filtered.forEach(item => {
+                    const option = document.createElement('option');
+                    option.value = item.thickness;
+                    option.textContent = `${item.thickness} mm`;
+                    thicknessSelect.appendChild(option);
+                });
+                thicknessSelect.disabled = false;
+            } else {
+                thicknessSelect.disabled = true;
+            }
+            updateResults();
+        });
+
+        thicknessSelect.addEventListener('change', updateResults);
+        qualitySelect.addEventListener('change', updateResults);
+
+        function updateResults() {
+            const mat = materialSelect.value;
+            const th = parseFloat(thicknessSelect.value);
+            const qual = qualitySelect.value;
+
+            if (!mat || isNaN(th)) {
+                resultsContainer.classList.add('hidden');
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            const record = database.find(item => item.material === mat && item.thickness === th);
+
+            if (record) {
+                let speed = record.speedBasto;
+                if (qual === 'medio') speed = record.speedMedio;
+                if (qual === 'fino') speed = record.speedFino;
+
+                document.getElementById('resSpeed').textContent = speed;
+                document.getElementById('resPerfAP').textContent = record.perfAP;
+                document.getElementById('resPerfBP').textContent = record.perfBP;
+                document.getElementById('resPressure').textContent = record.pressure;
+                document.getElementById('resFocalizer').textContent = record.focalizer;
+                document.getElementById('resOrifice').textContent = record.orifice;
+                document.getElementById('resDynamic').textContent = record.dynamic;
+
+                resultsContainer.classList.remove('hidden');
+                emptyState.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
